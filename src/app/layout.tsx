@@ -26,7 +26,12 @@ export const metadata: Metadata = {
     "KAVANA adalah toko lifestyle & goods kurasi — apparel, aksesoris, gadget, dan perlengkapan rumah. Demo portfolio single-vendor ecommerce.",
   keywords: ["KAVANA", "ecommerce", "toko online", "lifestyle", "demo portfolio"],
   icons: {
-    icon: "/logo.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icon.svg",
   },
 };
 
