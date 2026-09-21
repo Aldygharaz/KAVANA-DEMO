@@ -2,10 +2,11 @@
 // Prisma schema with SQLite
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Custom output: path khusus agar dev-server yang sudah berjalan bisa
   // memuat ulang client hasil generate terbaru (modul baru = cache miss).
-  output = "../prisma/generated-client"
+  output        = "../prisma/generated-client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

@@ -1,9 +1,11 @@
-import { PrismaClient } from '@/lib/prisma-client'
+import path from "path";
+import fs from "fs";
+import { PrismaClient } from "@/lib/prisma-client";
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-  prismaRev?: string
-}
+  prisma?: PrismaClient;
+  prismaRev?: string;
+};
 
 /**
  * Naikkan nilai ini setiap kali prisma/schema.prisma berubah.
@@ -11,17 +13,44 @@ const globalForPrisma = globalThis as unknown as {
  * (dengan DMMF schema lama) tetap terpakai walau client sudah di-generate ulang.
  * Rev baru memaksa instance baru dibuat dari client hasil generate terbaru.
  */
-const PRISMA_REV = "rev6-custom-output" // bump untuk Product.compareAtPrice + model EmailLog + output kustom
+const PRISMA_REV = "rev7-vercel-tmp-db";
 
-let db: PrismaClient
-if (globalForPrisma.prisma && globalForPrisma.prismaRev === PRISMA_REV) {
-  db = globalForPrisma.prisma
-} else {
-  db = new PrismaClient({
-    log: ['query'],
-  })
-  globalForPrisma.prisma = db
-  globalForPrisma.prismaRev = PRISMA_REV
+function getDatabaseUrl(): string | undefined {
+  if (process.env.VERCEL) {
+    const tmpDbPath = path.join("/tmp", "custom.db");
+    try {
+      if (!fs.existsSync(tmpDbPath)) {
+        const candidates = [
+          path.join(process.cwd(), "db", "custom.db"),
+          path.join(process.cwd(), "..", "db", "custom.db"),
+          path.resolve(__dirname, "../../db/custom.db"),
+        ];
+        const sourcePath = candidates.find((p) => fs.existsSync(p));
+        if (sourcePath) {
+          fs.copyFileSync(sourcePath, tmpDbPath);
+        }
+      }
+      const url = `file:${tmpDbPath}`;
+      process.env.DATABASE_URL = url;
+      return url;
+    } catch {
+      // Fallback bila copy gagal
+    }
+  }
+  return process.env.DATABASE_URL;
 }
 
-export { db }
+let db: PrismaClient;
+if (globalForPrisma.prisma && globalForPrisma.prismaRev === PRISMA_REV) {
+  db = globalForPrisma.prisma;
+} else {
+  const dbUrl = getDatabaseUrl();
+  db = new PrismaClient({
+    ...(dbUrl ? { datasourceUrl: dbUrl } : {}),
+    log: ["query"],
+  });
+  globalForPrisma.prisma = db;
+  globalForPrisma.prismaRev = PRISMA_REV;
+}
+
+export { db };

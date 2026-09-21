@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
+  outputFileTracingIncludes: {
+    "/*": ["./db/custom.db"],
+    "/api/**/*": ["./db/custom.db"],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
