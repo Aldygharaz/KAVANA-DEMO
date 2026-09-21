@@ -1,0 +1,164 @@
+// KAVANA — Single-Vendor Ecommerce Demo (Portfolio)
+// Prisma schema with SQLite
+
+generator client {
+  provider = "prisma-client-js"
+  // Custom output: path khusus agar dev-server yang sudah berjalan bisa
+  // memuat ulang client hasil generate terbaru (modul baru = cache miss).
+  output = "../prisma/generated-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  password  String // scrypt hash "salt:hash"
+  role      String    @default("CUSTOMER") // CUSTOMER | ADMIN
+  phone     String?
+  address   String?
+  city      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sessions  Session[]
+  orders    Order[]
+  reviews   Review[]
+  resetTokens PasswordResetToken[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Mock password-reset tokens (demo: kode 6 digit dikirim "via email",
+/// di sandbox kode ditampilkan langsung di UI mode demo).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  code      String    @unique // 6 digit
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  icon     String? // lucide icon name hint for frontend
+  products Product[]
+}
+
+model Product {
+  id             String      @id @default(cuid())
+  name           String
+  slug           String      @unique
+  description    String
+  price          Float
+  compareAtPrice Float? // harga sebelum diskon (harga coret); null = tidak didiskon
+  stock          Int
+  images         String // JSON string array of image urls
+  featured       Boolean     @default(false)
+  isActive       Boolean     @default(true)
+  categoryId     String
+  category       Category    @relation(fields: [categoryId], references: [id])
+  orderItems     OrderItem[]
+  reviews        Review[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([categoryId])
+  @@index([featured])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  status        String      @default("PENDING") // PENDING | PAID | SHIPPED | COMPLETED | CANCELLED
+  customerName  String
+  phone         String
+  address       String
+  city          String
+  postalCode    String?
+  notes         String?
+  subtotal      Float
+  shippingCost  Float
+  discount      Float     @default(0) // potongan dari kode promo
+  promoCode     String? // kode voucher yang dipakai (mis. KAVANA10)
+  total         Float
+  paymentMethod String? // VA_BCA | VA_MANDIRI | EWALLET | CARD (mock)
+  paymentRef    String? // mock payment reference e.g. PAY-xxxx
+  paidAt        DateTime?
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String // snapshot of product name at purchase time
+  price     Float // snapshot of price at purchase time
+  image     String? // snapshot
+  quantity  Int
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating       Int // 1..5
+  comment      String
+  helpfulCount Int      @default(0) // jumlah "Membantu" dari pengguna lain
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+/// Outbox email mock (demo): setiap event penting (reset password, welcome,
+/// pesanan dibayar/dikirim/dibatalkan) mencatat "email terkirim" di sini.
+/// Di produksi tabel ini diganti antrean pengiriman email sungguhan (SMTP).
+model EmailLog {
+  id         String    @id @default(cuid())
+  toEmail    String
+  subject    String
+  body       String
+  type       String // PASSWORD_RESET | WELCOME | ORDER_PAID | ORDER_SHIPPED | ORDER_CANCELLED
+  orderId    String?
+  orderNumber String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([type])
+  @@index([readAt])
+  @@index([createdAt])
+}
